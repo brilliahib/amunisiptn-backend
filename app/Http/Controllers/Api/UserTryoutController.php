@@ -302,9 +302,24 @@ class UserTryoutController extends Controller
         foreach ($tryoutSubtests as $index => $tryoutSubtest) {
             $subSession = $subtestSessions->firstWhere('tryout_subtest_id', $tryoutSubtest->id);
             
-            if (! $subSession || $subSession->status === 'in_progress') {
+            if (! $subSession) {
                 $activeSubtestIndex = $index;
                 break;
+            }
+
+            if ($subSession->status === 'in_progress') {
+                $endTime = \Carbon\Carbon::parse($subSession->started_at)->addMinutes((int) $tryoutSubtest->duration_minutes);
+                if (now()->greaterThan($endTime)) {
+                    $subSession->update([
+                        'status' => 'expired',
+                        'expired_at' => now(),
+                    ]);
+                    $activeSubtestIndex = $index + 1;
+                    continue;
+                } else {
+                    $activeSubtestIndex = $index;
+                    break;
+                }
             }
 
             $activeSubtestIndex = $index + 1;
@@ -551,6 +566,10 @@ class UserTryoutController extends Controller
         $endTime = $startedAt->addMinutes((int) $tryoutSubtest->duration_minutes);
         
         if (now()->greaterThan($endTime->addSeconds(10))) {
+            $subtestSession->update([
+                'status' => 'expired',
+                'expired_at' => now(),
+            ]);
             return response()->json(['message' => 'Waktu subtest sudah habis'], 422);
         }
 
