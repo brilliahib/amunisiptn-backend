@@ -291,10 +291,8 @@ class UserTryoutController extends Controller
             $session->refresh();
         }
 
-        // Calculate active subtest index
-        $tryoutSubtests = $tryout->tryoutSubtests->sortBy(function ($subtest) use ($user) {
-            return md5($user->id . $subtest->id);
-        })->values();
+        // Calculate active subtest index based on deterministic ULID order
+        $tryoutSubtests = $tryout->tryoutSubtests->sortBy('id')->values();
 
         $subtestSessions = TryoutSubtestSession::where('tryout_session_id', $session->id)->get();
         $activeSubtestIndex = 0;
@@ -302,9 +300,24 @@ class UserTryoutController extends Controller
         foreach ($tryoutSubtests as $index => $tryoutSubtest) {
             $subSession = $subtestSessions->firstWhere('tryout_subtest_id', $tryoutSubtest->id);
             
-            if (! $subSession || $subSession->status === 'in_progress') {
+            if (! $subSession) {
                 $activeSubtestIndex = $index;
                 break;
+            }
+
+            if ($subSession->status === 'in_progress') {
+                $endTime = \Carbon\Carbon::parse($subSession->started_at)->addMinutes((int) $tryoutSubtest->duration_minutes);
+                if (now()->greaterThan($endTime)) {
+                    $subSession->update([
+                        'status' => 'expired',
+                        'expired_at' => now(),
+                    ]);
+                    $activeSubtestIndex = $index + 1;
+                    continue;
+                } else {
+                    $activeSubtestIndex = $index;
+                    break;
+                }
             }
 
             $activeSubtestIndex = $index + 1;
@@ -315,11 +328,12 @@ class UserTryoutController extends Controller
             $activeSubtestIndex = max(0, $tryoutSubtests->count() - 1);
         }
 
-        $session->setAttribute('active_subtest_index', $activeSubtestIndex);
+        $sessionData = $session->toArray();
+        $sessionData['active_subtest_index'] = $activeSubtestIndex;
 
         return response()->json([
             'message' => 'Tryout dimulai',
-            'data' => $session,
+            'data' => $sessionData,
         ]);
     }
 
@@ -551,6 +565,10 @@ class UserTryoutController extends Controller
         $endTime = $startedAt->addMinutes((int) $tryoutSubtest->duration_minutes);
         
         if (now()->greaterThan($endTime->addSeconds(10))) {
+            $subtestSession->update([
+                'status' => 'expired',
+                'expired_at' => now(),
+            ]);
             return response()->json(['message' => 'Waktu subtest sudah habis'], 422);
         }
 
