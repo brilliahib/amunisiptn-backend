@@ -292,9 +292,7 @@ class UserTryoutController extends Controller
         }
 
         // Calculate active subtest index
-        $tryoutSubtests = $tryout->tryoutSubtests->sortBy(function ($subtest) use ($user) {
-            return md5($user->id . $subtest->id);
-        })->values();
+        $tryoutSubtests = $tryout->tryoutSubtests->sortBy('order_no')->values();
 
         $subtestSessions = TryoutSubtestSession::where('tryout_session_id', $session->id)->get();
         $activeSubtestIndex = 0;
@@ -330,11 +328,12 @@ class UserTryoutController extends Controller
             $activeSubtestIndex = max(0, $tryoutSubtests->count() - 1);
         }
 
-        $session->setAttribute('active_subtest_index', $activeSubtestIndex);
+        $sessionData = $session->toArray();
+        $sessionData['active_subtest_index'] = $activeSubtestIndex;
 
         return response()->json([
             'message' => 'Tryout dimulai',
-            'data' => $session,
+            'data' => $sessionData,
         ]);
     }
 
