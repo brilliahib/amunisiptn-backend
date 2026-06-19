@@ -291,8 +291,8 @@ class UserTryoutController extends Controller
             $session->refresh();
         }
 
-        // Calculate active subtest index
-        $tryoutSubtests = $tryout->tryoutSubtests->sortBy('order_no')->values();
+        // Calculate active subtest index based on deterministic ULID order
+        $tryoutSubtests = $tryout->tryoutSubtests->sortBy('id')->values();
 
         $subtestSessions = TryoutSubtestSession::where('tryout_session_id', $session->id)->get();
         $activeSubtestIndex = 0;
