@@ -136,9 +136,10 @@ class AdminUserController extends Controller
         $request->validate([
             'amount' => 'required|integer|min:1',
             'description' => 'required|string|max:255',
-            'filter_type' => 'required|in:all_vip,date_range',
+            'filter_type' => 'required|in:all_vip,date_range,single_user',
             'start_date' => 'required_if:filter_type,date_range|date|nullable',
             'end_date' => 'required_if:filter_type,date_range|date|after_or_equal:start_date|nullable',
+            'user_id' => 'required_if:filter_type,single_user|exists:users,id',
         ]);
 
         try {
@@ -152,6 +153,10 @@ class AdminUserController extends Controller
                     $q->whereBetween('created_at', [$startDate, $endDate]);
                 }
             });
+
+            if ($request->filter_type === 'single_user') {
+                $query->where('id', $request->user_id);
+            }
 
             $users = $query->get();
             $count = 0;
