@@ -402,35 +402,40 @@ class BulkImportQuestionController extends Controller
     private function cellToHtml(\PhpOffice\PhpSpreadsheet\Cell\Cell $cell): string
     {
         $value = $cell->getValue();
+        $html = '';
 
         if (! $value instanceof RichText) {
-            return nl2br(e(trim((string) $cell->getFormattedValue())), false);
+            $html = nl2br(e(trim((string) $cell->getFormattedValue()), false), false);
+        } else {
+            foreach ($value->getRichTextElements() as $element) {
+                $text = nl2br(e($element->getText(), false), false);
+
+                if ($element instanceof Run) {
+                    $font = $element->getFont();
+                    if ($font?->getBold()) {
+                        $text = "<strong>{$text}</strong>";
+                    }
+                    if ($font?->getItalic()) {
+                        $text = "<em>{$text}</em>";
+                    }
+                    if ($font?->getUnderline() && $font->getUnderline() !== 'none') {
+                        $text = "<u>{$text}</u>";
+                    }
+                    if ($font?->getSuperscript()) {
+                        $text = "<sup>{$text}</sup>";
+                    }
+                    if ($font?->getSubscript()) {
+                        $text = "<sub>{$text}</sub>";
+                    }
+                }
+
+                $html .= $text;
+            }
         }
 
-        $html = '';
-        foreach ($value->getRichTextElements() as $element) {
-            $text = nl2br(e($element->getText()), false);
-
-            if ($element instanceof Run) {
-                $font = $element->getFont();
-                if ($font?->getBold()) {
-                    $text = "<strong>{$text}</strong>";
-                }
-                if ($font?->getItalic()) {
-                    $text = "<em>{$text}</em>";
-                }
-                if ($font?->getUnderline() && $font->getUnderline() !== 'none') {
-                    $text = "<u>{$text}</u>";
-                }
-                if ($font?->getSuperscript()) {
-                    $text = "<sup>{$text}</sup>";
-                }
-                if ($font?->getSubscript()) {
-                    $text = "<sub>{$text}</sub>";
-                }
-            }
-
-            $html .= $text;
+        $alignment = strtolower($cell->getStyle()->getAlignment()->getHorizontal() ?? '');
+        if (in_array($alignment, ['justify', 'center', 'right'], true)) {
+            $html = '<div style="text-align: ' . $alignment . ';">' . $html . '</div>';
         }
 
         return RichTextSanitizer::sanitize($html) ?? '';
