@@ -59,6 +59,108 @@ class BulkImportQuestionController extends Controller
         ], $imported > 0 ? 201 : 422);
     }
 
+    public function updateImagesFromExcel(Request $request, Subtest $subtest): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx', 'max:10240'],
+        ]);
+
+        $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
+        $sheet       = $spreadsheet->getActiveSheet();
+
+        // Map: rowNumber → Drawing (gambar embedded)
+        $imageByRow = [];
+        foreach ($sheet->getDrawingCollection() as $drawing) {
+            preg_match('/(\d+)$/', $drawing->getCoordinates(), $m);
+            if (!empty($m[1])) {
+                $imageByRow[(int) $m[1]] = $drawing;
+            }
+        }
+
+        // Baca baris A-I sebagai teks (untuk deteksi header & baris kosong)
+        $allRows = [];
+        foreach ($sheet->getRowIterator() as $row) {
+            $cells = [];
+            foreach ($row->getCellIterator('A', 'I') as $cell) {
+                $cells[] = trim((string) $cell->getFormattedValue());
+            }
+            $allRows[$row->getRowIndex()] = $cells;
+        }
+
+        if (empty($allRows)) {
+            return response()->json([
+                'message' => 'File Excel kosong.',
+                'updated' => 0, 'skipped' => 0, 'errors' => ['File Excel kosong.'],
+            ], 422);
+        }
+
+        // Deteksi header (sama seperti importFromExcel)
+        $firstRow = reset($allRows);
+        $firstKey = array_key_first($allRows);
+        $isHeader = stripos($firstRow[1] ?? '', 'soal') !== false
+                 || stripos($firstRow[0] ?? '', 'gambar') !== false;
+        if ($isHeader) unset($allRows[$firstKey]);
+
+        // Soal existing, urut order_no — index 0-based sejajar dgn baris data
+        $questions = Question::where('subtest_id', $subtest->id)
+            ->orderBy('order_no')
+            ->get();
+
+        $errors   = [];
+        $updated  = 0;
+        $skipped  = 0;
+        $position = 0; // posisi soal yang sedang dipetakan (0-based)
+
+        foreach ($allRows as $rowNum => $cells) {
+            // Baris benar-benar kosong: lewati TANPA menggeser posisi
+            if (empty(array_filter($cells))) continue;
+
+            $question = $questions[$position] ?? null;
+            $position++;
+
+            // Tidak ada gambar di baris ini → soal dibiarkan apa adanya
+            if (!isset($imageByRow[$rowNum])) continue;
+
+            if (!$question) {
+                $errors[] = "Baris {$rowNum}: tidak ada soal yang cocok di posisi ini (jumlah baris Excel melebihi jumlah soal).";
+                $skipped++;
+                continue;
+            }
+
+            $newPath = $this->extractAndStoreImage($imageByRow[$rowNum], $rowNum, $errors);
+            if (!$newPath) {
+                // pesan error sudah ditambahkan di extractAndStoreImage
+                $skipped++;
+                continue;
+            }
+
+            $oldPath = $question->question_image;
+            $question->update(['question_image' => $newPath]);
+
+            // Bersihkan file gambar lama agar tidak jadi orphan
+            if ($oldPath && $oldPath !== $newPath) {
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $updated++;
+        }
+
+        if ($updated > 0) {
+            AuditLogger::log(
+                'Question', 'bulk_update_image',
+                "Update gambar {$updated} soal di subtest \"{$subtest->name}\" via Excel (emergency)" . ($skipped > 0 ? ", {$skipped} dilewati" : ''),
+                $request->user(), $subtest
+            );
+        }
+
+        return response()->json([
+            'message' => "{$updated} gambar soal berhasil diperbarui." . ($skipped > 0 ? " {$skipped} baris dilewati." : ''),
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'errors'  => $errors,
+        ], $updated > 0 ? 200 : 422);
+    }
+
     // -------------------------------------------------------------------------
     // CSV Import (format lama — tidak berubah)
     // Kolom: Soal | Opsi A | Opsi B | Opsi C | Opsi D | Opsi E | Penjelasan | Kunci
