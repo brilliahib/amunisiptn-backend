@@ -20,10 +20,10 @@ jobs:
         id: set-url
         run: |
           if [ "${{ github.ref_name }}" = "development" ]; then
-            echo "URL=https://staging-api.amunisiptn.com/symlink.php" >> $GITHUB_ENV
+            echo "URL=https://staging-api.amunisiptn.com/symlink-dev.php" >> $GITHUB_ENV
             echo "ENV_NAME=Staging (staging-api)" >> $GITHUB_ENV
           elif [ "${{ github.ref_name }}" = "main" ]; then
-            echo "URL=https://dev-api.amunisiptn.com/symlink.php" >> $GITHUB_ENV
+            echo "URL=https://dev-api.amunisiptn.com/symlink-prod.php" >> $GITHUB_ENV
             echo "ENV_NAME=Development (dev-api)" >> $GITHUB_ENV
           fi
 
