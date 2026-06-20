@@ -11,6 +11,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Font;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Facades\DB;
 
 class AdminUserController extends Controller
 {
@@ -102,5 +103,56 @@ class AdminUserController extends Controller
         return response()->json([
             'message' => 'Data pengguna berhasil dihapus oleh Admin.'
         ]);
+    }
+
+    public function injectVipTickets(Request $request): JsonResponse
+    {
+        $request->validate([
+            'amount' => 'required|integer|min:1',
+            'description' => 'required|string|max:255',
+            'filter_type' => 'required|in:all_vip,date_range',
+            'start_date' => 'required_if:filter_type,date_range|date|nullable',
+            'end_date' => 'required_if:filter_type,date_range|date|after_or_equal:start_date|nullable',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $query = User::whereHas('orders', function ($q) use ($request) {
+                $q->whereIn('status', ['paid', 'approved']);
+                if ($request->filter_type === 'date_range') {
+                    $startDate = \Carbon\Carbon::parse($request->start_date)->startOfDay();
+                    $endDate = \Carbon\Carbon::parse($request->end_date)->endOfDay();
+                    $q->whereBetween('created_at', [$startDate, $endDate]);
+                }
+            });
+
+            $users = $query->get();
+            $count = 0;
+
+            foreach ($users as $user) {
+                $user->increment('ticket_balance', $request->amount);
+                \App\Models\TicketLog::create([
+                    'user_id' => $user->id,
+                    'type' => 'credit',
+                    'amount' => $request->amount,
+                    'source' => 'admin_injection',
+                    'description' => $request->description,
+                ]);
+                $count++;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => "SUKSES! {$count} user VIP telah diinjeksi {$request->amount} tiket."
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal melakukan injeksi tiket.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
