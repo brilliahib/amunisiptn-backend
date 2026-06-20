@@ -16,6 +16,11 @@ class AdminPackageController extends Controller
     {
         $packages = Package::latest()->get();
 
+        $packages->transform(function ($package) {
+            $package->package_url = $package->thumbnail ? asset(Storage::disk('public')->url($package->thumbnail)) : null;
+            return $package;
+        });
+
         return response()->json([
             'data' => $packages,
         ]);
@@ -53,6 +58,8 @@ class AdminPackageController extends Controller
             'created_by'     => $request->user()->id,
         ]);
 
+        $package->package_url = $package->thumbnail ? asset(Storage::disk('public')->url($package->thumbnail)) : null;
+
         return response()->json([
             'message' => 'Paket berhasil dibuat',
             'data'    => $package,
@@ -61,6 +68,8 @@ class AdminPackageController extends Controller
 
     public function show(Package $package): JsonResponse
     {
+        $package->package_url = $package->thumbnail ? asset(Storage::disk('public')->url($package->thumbnail)) : null;
+
         return response()->json([
             'data' => $package,
         ]);
@@ -100,6 +109,8 @@ class AdminPackageController extends Controller
             'currency'       => $validated['currency'] ?? 'IDR',
             'is_active'      => $validated['is_active'] ?? true,
         ]);
+
+        $package->package_url = $package->thumbnail ? asset(Storage::disk('public')->url($package->thumbnail)) : null;
 
         return response()->json([
             'message' => 'Paket berhasil diupdate',

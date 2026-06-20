@@ -38,6 +38,7 @@ Route::post('/midtrans/callback', [PaymentCallbackController::class, 'handle']);
 Route::prefix('auth')->controller(AuthController::class)->group(function () {
     Route::post('/register', 'register');
     Route::post('/login', 'login');
+    Route::post('/refresh', 'refresh');
     Route::get('/google/redirect', 'redirectToGoogle');
     Route::get('/google/callback', 'handleGoogleCallback');
 
@@ -122,6 +123,7 @@ Route::middleware(['auth:sanctum', 'admin'])
         // --- SUBTEST & MASTER SOAL ---
         Route::apiResource('subtests', SubtestController::class)->except(['index']);
         Route::apiResource('subtests.questions', QuestionController::class);
+        Route::post('/subtests/{subtest}/questions/bulk-update-images', [BulkImportQuestionController::class, 'updateImagesFromExcel']);
         Route::post('/subtests/{subtest}/questions/bulk-import', [BulkImportQuestionController::class, 'store']);
         Route::get('/questions/bulk-import/template', [BulkImportQuestionController::class, 'template']);
         Route::get('/questions/bulk-import/excel-template', [BulkImportQuestionController::class, 'excelTemplate']);

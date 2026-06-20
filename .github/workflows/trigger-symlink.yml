@@ -1,0 +1,53 @@
+name: Trigger Symlink on Hostinger
+
+on:
+  push:
+    branches:
+      - development
+      - main
+
+jobs:
+  run-symlink:
+    name: Run Symlink Script
+    runs-on: ubuntu-latest
+    steps:
+      # Beri jeda sedikit agar Hostinger punya waktu untuk melakukan pull/deploy file terlebih dahulu
+      - name: Wait for Git Deployment to finish
+        run: sleep 15
+
+      # Tentukan URL berdasarkan branch yang di-push
+      - name: Determine Target URL
+        id: set-url
+        run: |
+          if [ "${{ github.ref_name }}" = "development" ]; then
+            echo "URL=https://staging-api.amunisiptn.com/symlink-dev.php" >> $GITHUB_ENV
+            echo "ENV_NAME=Staging (staging-api)" >> $GITHUB_ENV
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            echo "URL=https://dev-api.amunisiptn.com/symlink-prod.php" >> $GITHUB_ENV
+            echo "ENV_NAME=Development (dev-api)" >> $GITHUB_ENV
+          fi
+
+      - name: Trigger symlink.php
+        run: |
+          echo "========================================"
+          echo "Target Environment: ${{ env.ENV_NAME }}"
+          echo "Target URL: ${{ env.URL }}"
+          echo "========================================"
+          echo "Triggering symlink.php..."
+
+          # Mengambil body response dan status HTTP code sekaligus
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" ${{ env.URL }})
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n1)
+
+          echo "Server Response:"
+          echo "----------------------------------------"
+          echo "$HTTP_BODY" | sed 's/<br>//g'
+          echo "----------------------------------------"
+
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "Successfully triggered symlink.php (HTTP $HTTP_STATUS)"
+          else
+            echo "Failed to trigger symlink.php (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
