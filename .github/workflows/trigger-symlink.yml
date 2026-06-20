@@ -34,7 +34,16 @@ jobs:
           echo "Target URL: ${{ env.URL }}"
           echo "========================================"
           echo "Triggering symlink.php..."
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.URL }})
+
+          # Mengambil body response dan status HTTP code sekaligus
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" ${{ env.URL }})
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n1)
+
+          echo "Server Response:"
+          echo "----------------------------------------"
+          echo "$HTTP_BODY" | sed 's/<br>//g'
+          echo "----------------------------------------"
 
           if [ "$HTTP_STATUS" -eq 200 ]; then
             echo "Successfully triggered symlink.php (HTTP $HTTP_STATUS)"
