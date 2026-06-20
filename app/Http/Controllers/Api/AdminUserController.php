@@ -117,7 +117,9 @@ class AdminUserController extends Controller
                 $endDate = \Carbon\Carbon::parse($request->end_date)->endOfDay();
                 $q->whereBetween('created_at', [$startDate, $endDate]);
             }
-        });
+        })->withMax(['orders as last_transaction_date' => function($q) {
+            $q->whereIn('status', ['paid', 'approved']);
+        }], 'created_at');
 
         if ($search) {
             $query->where(function($q) use ($search) {
