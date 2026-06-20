@@ -105,6 +105,32 @@ class AdminUserController extends Controller
         ]);
     }
 
+    public function vipPreview(Request $request): JsonResponse
+    {
+        $perPage = min((int) ($request->per_page ?? 10), 100);
+        $search = $request->search;
+        
+        $query = User::whereHas('orders', function ($q) use ($request) {
+            $q->whereIn('status', ['paid', 'approved']);
+            if ($request->filter_type === 'date_range' && $request->start_date && $request->end_date) {
+                $startDate = \Carbon\Carbon::parse($request->start_date)->startOfDay();
+                $endDate = \Carbon\Carbon::parse($request->end_date)->endOfDay();
+                $q->whereBetween('created_at', [$startDate, $endDate]);
+            }
+        });
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $users = $query->latest()->paginate($perPage);
+
+        return response()->json($users);
+    }
+
     public function injectVipTickets(Request $request): JsonResponse
     {
         $request->validate([
@@ -136,7 +162,7 @@ class AdminUserController extends Controller
                     'user_id' => $user->id,
                     'type' => 'credit',
                     'amount' => $request->amount,
-                    'source' => 'admin_injection',
+                    'source' => 'Sistem AmunisiPTN',
                     'description' => $request->description,
                 ]);
                 $count++;

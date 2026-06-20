@@ -119,6 +119,7 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::get('/users/export', [AdminUserController::class, 'export']);
         Route::get('/users/{user}', [AdminUserController::class, 'show']);
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
+        Route::get('/users/vip-preview', [AdminUserController::class, 'vipPreview']);
         Route::post('/users/inject-vip-tickets', [AdminUserController::class, 'injectVipTickets']);
 
         // --- SUBTEST & MASTER SOAL ---
