@@ -15,7 +15,7 @@ try {
     } else {
         if (!function_exists('symlink')) throw new Exception("Fungsi symlink() dinonaktifkan (disabled).");
         if (symlink($target, $link)) {
-            echo "Symlink created successfully!";
+            echo "Symlink in production (dev-api.amunisiptn.com) created successfully!";
         } else {
             echo "Failed to create symlink. Terjadi kesalahan pada level sistem file.";
         }
