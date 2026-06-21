@@ -11,6 +11,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Font;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Facades\DB;
 
 class AdminUserController extends Controller
 {
@@ -102,5 +103,89 @@ class AdminUserController extends Controller
         return response()->json([
             'message' => 'Data pengguna berhasil dihapus oleh Admin.'
         ]);
+    }
+
+    public function vipPreview(Request $request): JsonResponse
+    {
+        $perPage = min((int) ($request->per_page ?? 10), 100);
+        $search = $request->search;
+        
+        $query = User::whereHas('orders', function ($q) use ($request) {
+            $q->whereIn('status', ['paid', 'approved']);
+            if ($request->filter_type === 'date_range' && $request->start_date && $request->end_date) {
+                $startDate = \Carbon\Carbon::parse($request->start_date)->startOfDay();
+                $endDate = \Carbon\Carbon::parse($request->end_date)->endOfDay();
+                $q->whereBetween('created_at', [$startDate, $endDate]);
+            }
+        })->withMax(['orders as last_transaction_date' => function($q) {
+            $q->whereIn('status', ['paid', 'approved']);
+        }], 'created_at');
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $users = $query->latest()->paginate($perPage);
+
+        return response()->json($users);
+    }
+
+    public function injectVipTickets(Request $request): JsonResponse
+    {
+        $request->validate([
+            'amount' => 'required|integer|min:1',
+            'description' => 'required|string|max:255',
+            'filter_type' => 'required|in:all_vip,date_range,single_user',
+            'start_date' => 'required_if:filter_type,date_range|date|nullable',
+            'end_date' => 'required_if:filter_type,date_range|date|after_or_equal:start_date|nullable',
+            'user_id' => 'required_if:filter_type,single_user|exists:users,id',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $query = User::whereHas('orders', function ($q) use ($request) {
+                $q->whereIn('status', ['paid', 'approved']);
+                if ($request->filter_type === 'date_range') {
+                    $startDate = \Carbon\Carbon::parse($request->start_date)->startOfDay();
+                    $endDate = \Carbon\Carbon::parse($request->end_date)->endOfDay();
+                    $q->whereBetween('created_at', [$startDate, $endDate]);
+                }
+            });
+
+            if ($request->filter_type === 'single_user') {
+                $query->where('id', $request->user_id);
+            }
+
+            $users = $query->get();
+            $count = 0;
+
+            foreach ($users as $user) {
+                $user->increment('ticket_balance', $request->amount);
+                \App\Models\TicketLog::create([
+                    'user_id' => $user->id,
+                    'type' => 'credit',
+                    'amount' => $request->amount,
+                    'source' => 'Sistem AmunisiPTN',
+                    'description' => $request->description,
+                ]);
+                $count++;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => "SUKSES! {$count} user VIP telah diinjeksi {$request->amount} tiket."
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal melakukan injeksi tiket.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

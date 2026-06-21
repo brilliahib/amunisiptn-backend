@@ -4,7 +4,7 @@ namespace App\Support;
 
 class RichTextSanitizer
 {
-    private const ALLOWED_TAGS = '<p><br><strong><b><em><i><u><ol><ul><li><sup><sub><span>';
+    private const ALLOWED_TAGS = '<p><br><strong><b><em><i><u><ol><ul><li><sup><sub><span><div>';
 
     public static function sanitize(?string $html): ?string
     {
@@ -31,7 +31,7 @@ class RichTextSanitizer
                 ->map(fn (string $rule) => trim($rule))
                 ->filter(function (string $rule) {
                     $property = strtolower(trim(strtok($rule, ':') ?: ''));
-                    return in_array($property, ['font-weight', 'font-style', 'text-decoration'], true);
+                    return in_array($property, ['font-weight', 'font-style', 'text-decoration', 'text-align'], true);
                 })
                 ->implode('; ');
 
