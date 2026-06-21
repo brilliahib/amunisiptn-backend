@@ -28,10 +28,10 @@ class AuthController extends Controller
             'role' => 'user',
         ]);
 
-        $tokenRaw = $user->createToken('auth-token', ['access'], now()->addMinutes(120))->plainTextToken;
+        $tokenRaw = $user->createToken('auth-token', ['access'], now()->addDays(30))->plainTextToken;
         $token = explode('|', $tokenRaw, 2)[1];
 
-        $refreshTokenRaw = $user->createToken('refresh-token', ['refresh'], now()->addDays(7))->plainTextToken;
+        $refreshTokenRaw = $user->createToken('refresh-token', ['refresh'], now()->addDays(30))->plainTextToken;
         $refreshToken = explode('|', $refreshTokenRaw, 2)[1];
 
         AuditLogger::log('Auth', 'register', "Pengguna baru mendaftar: {$user->name} ({$user->email})", $user);
@@ -41,7 +41,7 @@ class AuthController extends Controller
             'user' => $user,
             'token' => $token,
             'refresh_token' => $refreshToken,
-            'expires_in' => 7200,
+            'expires_in' => 2592000,
         ], 201);
     }
 
@@ -66,13 +66,10 @@ class AuthController extends Controller
             ]);
         }
 
-        // --- SINGLE DEVICE LOGIN ---
-        $user->tokens()->delete();
-
-        $tokenRaw = $user->createToken('auth-token', ['access'], now()->addMinutes(120))->plainTextToken;
+        $tokenRaw = $user->createToken('auth-token', ['access'], now()->addDays(30))->plainTextToken;
         $token = explode('|', $tokenRaw, 2)[1];
 
-        $refreshTokenRaw = $user->createToken('refresh-token', ['refresh'], now()->addDays(7))->plainTextToken;
+        $refreshTokenRaw = $user->createToken('refresh-token', ['refresh'], now()->addDays(30))->plainTextToken;
         $refreshToken = explode('|', $refreshTokenRaw, 2)[1];
 
         AuditLogger::log('Auth', 'login', "Login berhasil: {$user->name} ({$user->email})", $user);
@@ -82,7 +79,7 @@ class AuthController extends Controller
             'user' => $user,
             'token' => $token,
             'refresh_token' => $refreshToken,
-            'expires_in' => 7200,
+            'expires_in' => 2592000,
         ]);
     }
 
@@ -126,13 +123,13 @@ class AuthController extends Controller
         $user->tokens()->where('abilities', 'LIKE', '%"access"%')->delete();
 
         // Create new access token
-        $tokenRaw = $user->createToken('auth-token', ['access'], now()->addMinutes(120))->plainTextToken;
+        $tokenRaw = $user->createToken('auth-token', ['access'], now()->addDays(30))->plainTextToken;
         $token = explode('|', $tokenRaw, 2)[1];
 
         return response()->json([
             'token' => $token,
             'refresh_token' => $refreshToken,
-            'expires_in' => 7200,
+            'expires_in' => 2592000,
         ]);
     }
 
@@ -168,20 +165,15 @@ class AuthController extends Controller
                 }
             }
 
-            // --- SINGLE DEVICE LOGIN ---
-            $user->tokens()->delete();
-
-            $tokenRaw = $user->createToken('auth-token', ['access'], now()->addMinutes(120))->plainTextToken;
+            $tokenRaw = $user->createToken('auth-token', ['access'], now()->addDays(30))->plainTextToken;
             $token = explode('|', $tokenRaw, 2)[1];
 
-            $refreshTokenRaw = $user->createToken('refresh-token', ['refresh'], now()->addDays(7))->plainTextToken;
+            $refreshTokenRaw = $user->createToken('refresh-token', ['refresh'], now()->addDays(30))->plainTextToken;
             $refreshToken = explode('|', $refreshTokenRaw, 2)[1];
 
             $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
-            
-            // Note: Google callback might need to pass the refresh token to frontend if it uses it.
-            // But since frontend just sets it as URL param, we can append it.
-            return redirect()->away($frontendUrl . '/auth/callback?token=' . $token . '&refresh_token=' . $refreshToken . '&expires_in=7200');
+
+            return redirect()->away($frontendUrl . '/auth/callback?token=' . $token . '&refresh_token=' . $refreshToken . '&expires_in=2592000');
 
         } catch (\Exception $e) {
             $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
