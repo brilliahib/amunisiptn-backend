@@ -18,7 +18,7 @@ class RichTextSanitizer
         }
 
         if (! str_contains($html, '<')) {
-            return nl2br(e($html), false);
+            return nl2br(e($html, false), false);
         }
 
         $html = preg_replace('/<(script|style|iframe|object|embed|link|meta)[^>]*>.*?<\/\1>/is', '', $html) ?? '';
