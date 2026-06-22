@@ -142,6 +142,7 @@ class AdminUserController extends Controller
             'start_date' => 'required_if:filter_type,date_range|date|nullable',
             'end_date' => 'required_if:filter_type,date_range|date|after_or_equal:start_date|nullable',
             'user_id' => 'required_if:filter_type,single_user|exists:users,id',
+            'action' => 'nullable|in:inject,pull',
         ]);
 
         try {
@@ -162,23 +163,41 @@ class AdminUserController extends Controller
 
             $users = $query->get();
             $count = 0;
+            $action = $request->input('action', 'inject');
 
             foreach ($users as $user) {
-                $user->increment('ticket_balance', $request->amount);
-                \App\Models\TicketLog::create([
-                    'user_id' => $user->id,
-                    'type' => 'credit',
-                    'amount' => $request->amount,
-                    'source' => 'Sistem AmunisiPTN',
-                    'description' => $request->description,
-                ]);
-                $count++;
+                if ($action === 'pull') {
+                    // Hanya tarik maksimal sejumlah saldo yang dimiliki
+                    $deduct = min($user->ticket_balance, $request->amount);
+                    if ($deduct > 0) {
+                        $user->decrement('ticket_balance', $deduct);
+                        \App\Models\TicketLog::create([
+                            'user_id' => $user->id,
+                            'type' => 'debit',
+                            'amount' => $deduct,
+                            'source' => 'Sistem AmunisiPTN',
+                            'description' => $request->description,
+                        ]);
+                        $count++;
+                    }
+                } else {
+                    $user->increment('ticket_balance', $request->amount);
+                    \App\Models\TicketLog::create([
+                        'user_id' => $user->id,
+                        'type' => 'credit',
+                        'amount' => $request->amount,
+                        'source' => 'Sistem AmunisiPTN',
+                        'description' => $request->description,
+                    ]);
+                    $count++;
+                }
             }
 
             DB::commit();
 
+            $actionText = $action === 'pull' ? 'ditarik' : 'diinjeksi';
             return response()->json([
-                'message' => "SUKSES! {$count} user VIP telah diinjeksi {$request->amount} tiket."
+                'message' => "Berhasil memproses tiket untuk {$count} pengguna."
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
