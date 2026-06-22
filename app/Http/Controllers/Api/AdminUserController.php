@@ -119,7 +119,13 @@ class AdminUserController extends Controller
             }
         })->withMax(['orders as last_transaction_date' => function($q) {
             $q->whereIn('status', ['paid', 'approved']);
-        }], 'created_at');
+        }], 'created_at')
+          ->withSum(['ticketLogs as total_tickets_in' => function($q) {
+              $q->where('type', 'credit');
+          }], 'amount')
+          ->withSum(['ticketLogs as total_tickets_out' => function($q) {
+              $q->where('type', 'debit');
+          }], 'amount');
 
         if ($search) {
             $query->where(function($q) use ($search) {
@@ -131,6 +137,17 @@ class AdminUserController extends Controller
         $users = $query->latest()->paginate($perPage);
 
         return response()->json($users);
+    }
+
+    public function ticketLogs(Request $request, User $user): JsonResponse
+    {
+        $perPage = min((int) ($request->per_page ?? 10), 100);
+
+        $logs = $user->ticketLogs()
+            ->latest()
+            ->paginate($perPage);
+
+        return response()->json($logs);
     }
 
     public function injectVipTickets(Request $request): JsonResponse
@@ -195,9 +212,9 @@ class AdminUserController extends Controller
 
             DB::commit();
 
-            $actionText = $action === 'pull' ? 'ditarik' : 'diinjeksi';
+            $actionText = $action === 'pull' ? 'menarik tiket dari' : 'menginjeksi tiket ke';
             return response()->json([
-                'message' => "Berhasil memproses tiket untuk {$count} pengguna."
+                'message' => "Berhasil {$actionText} {$count} pengguna."
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
