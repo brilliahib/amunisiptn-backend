@@ -31,7 +31,10 @@ class RichTextSanitizer
                 ->map(fn (string $rule) => trim($rule))
                 ->filter(function (string $rule) {
                     $property = strtolower(trim(strtok($rule, ':') ?: ''));
-                    return in_array($property, ['font-weight', 'font-style', 'text-decoration', 'text-align'], true);
+                    return in_array($property, [
+                        'font-weight', 'font-style', 'text-decoration', 'text-align',
+                        'display', 'vertical-align', 'border-bottom', 'padding', 'margin', 'line-height', 'flex-direction'
+                    ], true);
                 })
                 ->implode('; ');
 
