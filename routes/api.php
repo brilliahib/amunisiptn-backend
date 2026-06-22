@@ -120,6 +120,7 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::get('/users/vip-preview', [AdminUserController::class, 'vipPreview']);
         Route::post('/users/inject-vip-tickets', [AdminUserController::class, 'injectVipTickets']);
         Route::get('/users/{user}', [AdminUserController::class, 'show']);
+        Route::get('/users/{user}/ticket-logs', [AdminUserController::class, 'ticketLogs']);
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
 
         // --- SUBTEST & MASTER SOAL ---
