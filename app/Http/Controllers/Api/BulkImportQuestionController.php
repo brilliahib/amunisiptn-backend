@@ -39,23 +39,24 @@ class BulkImportQuestionController extends Controller
         $file = $request->file('file');
         $ext  = strtolower($file->getClientOriginalExtension());
 
-        [$imported, $skipped, $errors] = $ext === 'xlsx'
+        [$imported, $skipped, $errors, $importedImages] = $ext === 'xlsx'
             ? $this->importFromExcel($file, $subtest)
             : $this->importFromCsv($file, $subtest);
 
         if ($imported > 0) {
             AuditLogger::log(
                 'Question', 'bulk_import',
-                "Import {$imported} soal ke subtest \"{$subtest->name}\"" . ($skipped > 0 ? ", {$skipped} baris dilewati" : ''),
+                "Import {$imported} soal ke subtest \"{$subtest->name}\"" . ($skipped > 0 ? ", {$skipped} baris dilewati" : '') . ($importedImages > 0 ? " ({$importedImages} gambar)" : ''),
                 $request->user(), $subtest
             );
         }
 
         return response()->json([
-            'message'  => "{$imported} soal berhasil diimpor." . ($skipped > 0 ? " {$skipped} baris dilewati." : ''),
-            'imported' => $imported,
-            'skipped'  => $skipped,
-            'errors'   => $errors,
+            'message'         => "{$imported} soal berhasil diimpor." . ($skipped > 0 ? " {$skipped} baris dilewati." : '') . ($importedImages > 0 ? " ({$importedImages} gambar terbaca)" : ''),
+            'imported'        => $imported,
+            'imported_images' => $importedImages,
+            'skipped'         => $skipped,
+            'errors'          => $errors,
         ], $imported > 0 ? 201 : 422);
     }
 
@@ -248,6 +249,7 @@ class BulkImportQuestionController extends Controller
         $errors   = [];
         $imported = 0;
         $skipped  = 0;
+        $importedImages = 0;
         $maxQ     = $subtest->max_questions;
         $currentQ = Question::where('subtest_id', $subtest->id)->count();
         $startNo  = $currentQ + 1;
@@ -304,6 +306,9 @@ class BulkImportQuestionController extends Controller
             $imagePath = null;
             if (isset($imageByRow[$rowNum])) {
                 $imagePath = $this->extractAndStoreImage($imageByRow[$rowNum], $lineNo, $errors);
+                if ($imagePath) {
+                    $importedImages++;
+                }
             }
 
             $orderNo = $startNo + $imported;
@@ -335,7 +340,7 @@ class BulkImportQuestionController extends Controller
             $imported++;
         }
 
-        return [$imported, $skipped, $errors];
+        return [$imported, $skipped, $errors, $importedImages];
     }
 
     // -------------------------------------------------------------------------
@@ -546,7 +551,7 @@ class BulkImportQuestionController extends Controller
             $imported++;
         }
 
-        return [$imported, $skipped, $errors];
+        return [$imported, $skipped, $errors, 0];
     }
 
     // -------------------------------------------------------------------------
