@@ -438,6 +438,27 @@ class BulkImportQuestionController extends Controller
             $html = '<div style="text-align: ' . $alignment . ';">' . $html . '</div>';
         }
 
+        // Auto-convert plain text exponents and subscripts into HTML
+        $html = preg_replace([
+            '/\^\{([^}]+)\}/',       // Matches ^{something}
+            '/\^\(([^)]+)\)/',       // Matches ^(something)
+            '/\^([A-Za-z0-9\-\+]+)/',// Matches ^something
+
+            '/\_\{([^}]+)\}/',       // Matches _{something}
+            '/\_\(([^)]+)\)/',       // Matches _(something)
+            '/\_([0-9]+)/',          // Matches _123 (only numbers to avoid breaking snake_case text)
+
+            '/(?i)\bakar\s*\(/',     // Matches akar(, AKAR(, Akar ( -> safely targets math roots only
+        ], [
+            '<sup>$1</sup>',
+            '<sup>$1</sup>',
+            '<sup>$1</sup>',
+            '<sub>$1</sub>',
+            '<sub>$1</sub>',
+            '<sub>$1</sub>',
+            '√('
+        ], $html);
+
         return RichTextSanitizer::sanitize($html) ?? '';
     }
 

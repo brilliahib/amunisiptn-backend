@@ -35,7 +35,7 @@ class RichTextSanitizer
                 })
                 ->implode('; ');
 
-            return $safe ? ' style="' . e($safe) . '"' : '';
+            return $safe ? ' style="' . e($safe, false) . '"' : '';
         }, $html) ?? '';
 
         return trim($html) ?: null;
