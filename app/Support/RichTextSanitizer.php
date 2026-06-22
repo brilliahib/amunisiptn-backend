@@ -18,7 +18,7 @@ class RichTextSanitizer
         }
 
         if (! str_contains($html, '<')) {
-            return nl2br(e($html), false);
+            return nl2br(e($html, false), false);
         }
 
         $html = preg_replace('/<(script|style|iframe|object|embed|link|meta)[^>]*>.*?<\/\1>/is', '', $html) ?? '';
@@ -31,11 +31,14 @@ class RichTextSanitizer
                 ->map(fn (string $rule) => trim($rule))
                 ->filter(function (string $rule) {
                     $property = strtolower(trim(strtok($rule, ':') ?: ''));
-                    return in_array($property, ['font-weight', 'font-style', 'text-decoration', 'text-align'], true);
+                    return in_array($property, [
+                        'font-weight', 'font-style', 'text-decoration', 'text-align',
+                        'display', 'vertical-align', 'border-bottom', 'padding', 'margin', 'line-height', 'flex-direction'
+                    ], true);
                 })
                 ->implode('; ');
 
-            return $safe ? ' style="' . e($safe) . '"' : '';
+            return $safe ? ' style="' . e($safe, false) . '"' : '';
         }, $html) ?? '';
 
         return trim($html) ?: null;

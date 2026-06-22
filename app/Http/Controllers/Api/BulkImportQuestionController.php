@@ -438,6 +438,34 @@ class BulkImportQuestionController extends Controller
             $html = '<div style="text-align: ' . $alignment . ';">' . $html . '</div>';
         }
 
+        // Auto-convert plain text exponents and subscripts into HTML
+        $html = preg_replace([
+            '/\^\{([^}]+)\}/',       // Matches ^{something}
+            '/\^\(([^)]+)\)/',       // Matches ^(something)
+            '/\^([A-Za-z0-9\-\+]+)/',// Matches ^something
+
+            '/\_\{([^}]+)\}/',       // Matches _{something}
+            '/\_\(([^)]+)\)/',       // Matches _(something)
+            '/\_([0-9]+)/',          // Matches _123 (only numbers to avoid breaking snake_case text)
+
+            '/(?i)\bakar\s*\(/',     // Matches akar(, AKAR(, Akar ( -> safely targets math roots only
+            '/(?i)\bPI\b/',          // Matches isolated word PI, pi, Pi -> turns into π
+
+            '/\(([^)]+)\)\s*\/\s*\(([^)]+)\)/',       // Matches (A)/(B)
+            '/(?i)\bfrac\s*\(([^,]+),\s*([^)]+)\)/',  // Matches frac(A, B)
+        ], [
+            '<sup>$1</sup>',
+            '<sup>$1</sup>',
+            '<sup>$1</sup>',
+            '<sub>$1</sub>',
+            '<sub>$1</sub>',
+            '<sub>$1</sub>',
+            '√(',
+            'π',
+            '<span style="display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.1; margin: 0 0.2em;"><span style="border-bottom: 1px solid currentColor; padding: 0 0.2em;">$1</span><span style="padding: 0 0.2em;">$2</span></span>',
+            '<span style="display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.1; margin: 0 0.2em;"><span style="border-bottom: 1px solid currentColor; padding: 0 0.2em;">$1</span><span style="padding: 0 0.2em;">$2</span></span>'
+        ], $html);
+
         return RichTextSanitizer::sanitize($html) ?? '';
     }
 
