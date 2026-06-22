@@ -545,7 +545,6 @@ class UserTryoutController extends Controller
 
         $session = TryoutSession::where('user_id', $user->id)
             ->where('tryout_id', $tryout->id)
-            ->where('status', '!=', 'finished')
             ->latest('created_at')
             ->first();
 
@@ -557,8 +556,16 @@ class UserTryoutController extends Controller
             ->where('tryout_subtest_id', $tryoutSubtest->id)
             ->first();
 
-        if (! $subtestSession || $subtestSession->status !== 'in_progress') {
-            return response()->json(['message' => 'Subtest belum dimulai atau sudah selesai'], 422);
+        if (! $subtestSession) {
+            return response()->json(['message' => 'Subtest belum dimulai'], 422);
+        }
+
+        if ($subtestSession->status !== 'in_progress') {
+            // Berikan grace period 30 detik untuk mengakomodasi request yang datang terlambat (race condition)
+            $endedAt = $subtestSession->finished_at ?? $subtestSession->expired_at;
+            if (!$endedAt || now()->diffInSeconds(\Carbon\Carbon::parse($endedAt)) > 30) {
+                return response()->json(['message' => 'Subtest sudah selesai'], 422);
+            }
         }
 
         $startedAt = \Carbon\Carbon::parse($subtestSession->started_at);
@@ -577,7 +584,7 @@ class UserTryoutController extends Controller
             $answer = RichTextSanitizer::sanitize($answer);
         }
 
-        if ($answer && trim(strip_tags($answer)) !== '') {
+        if ($answer !== null && trim(strip_tags((string) $answer)) !== '') {
             $correctAnswer = $question->correct_answer ?? null;
             $isCorrect = $question->question_type === 'essay'
                 ? true
@@ -1000,13 +1007,19 @@ class UserTryoutController extends Controller
             return response()->json(['message' => 'Review hanya bisa diakses setelah tryout selesai'], 422);
         }
 
-        $subtestIds = TryoutSubtest::where('tryout_id', $tryout->id)->pluck('subtest_id');
+        $tryoutSubtests = TryoutSubtest::where('tryout_id', $tryout->id)->orderBy('id')->get();
+        $subtestIds = $tryoutSubtests->pluck('subtest_id')->toArray();
 
-        $questions = Question::with(['options', 'subtest'])
+        $questionsRaw = Question::with(['options', 'subtest'])
             ->whereIn('subtest_id', $subtestIds)
             ->where('is_active', true)
-            ->orderBy('order_no')
             ->get();
+
+        // Urutkan soal berdasarkan urutan subtest, lalu berdasarkan order_no (nomor asli soal)
+        $questions = $questionsRaw->sortBy(function ($q) use ($subtestIds) {
+            $subtestIndex = array_search($q->subtest_id, $subtestIds);
+            return sprintf('%04d_%04d', $subtestIndex, $q->order_no);
+        })->values();
 
         $userAnswers = UserAnswer::where('tryout_session_id', $session->id)
             ->get()
