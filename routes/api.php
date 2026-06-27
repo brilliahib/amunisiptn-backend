@@ -25,6 +25,8 @@ use App\Http\Controllers\Api\AdminTicketRedeemCodeController;
 use App\Http\Controllers\Api\AdminTryoutProofController;
 use App\Http\Controllers\Api\BulkImportQuestionController;
 use App\Http\Controllers\Api\TicketLogController;
+use App\Http\Controllers\Api\TicketReportController;
+use App\Http\Controllers\Api\AdminTicketReportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -58,6 +60,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/access-codes/redeem', [AccessCodeController::class, 'redeem']);
     Route::get('/ticket-logs', [TicketLogController::class, 'index']);
     Route::get('/subtests', [SubtestController::class, 'index']);
+
+    // Ticket Reports (User)
+    Route::get('/ticket-reports', [TicketReportController::class, 'index']);
+    Route::post('/ticket-reports', [TicketReportController::class, 'store']);
+    Route::get('/ticket-reports/{id}', [TicketReportController::class, 'show']);
+    Route::post('/ticket-reports/{id}/reply', [TicketReportController::class, 'reply']);
 
     // Package & Orders
     Route::apiResource('packages', PackageCatalogController::class)->only(['index', 'show']);
@@ -109,6 +117,12 @@ Route::middleware(['auth:sanctum', 'admin'])
 
         Route::get('/stats', [AdminStatsController::class, 'index']);
         Route::get('/sales-report', [AdminSalesReportController::class, 'index']);
+
+        // Ticket Reports (Admin)
+        Route::get('/ticket-reports', [AdminTicketReportController::class, 'index']);
+        Route::get('/ticket-reports/{ticketReport}', [AdminTicketReportController::class, 'show']);
+        Route::patch('/ticket-reports/{ticketReport}/status', [AdminTicketReportController::class, 'updateStatus']);
+        Route::post('/ticket-reports/{ticketReport}/reply', [AdminTicketReportController::class, 'reply']);
         Route::get('/fee-to-report', [AdminSalesReportController::class, 'feeTryout']);
         Route::get('/tryout-proof-images', [AdminTryoutProofController::class, 'index']);
         Route::get('/audit-logs', [AdminAuditLogController::class, 'index']);
