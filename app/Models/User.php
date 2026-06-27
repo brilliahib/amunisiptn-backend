@@ -72,4 +72,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(TicketLog::class);
     }
+
+    public function ticketReports()
+    {
+        return $this->hasMany(TicketReport::class);
+    }
 }
