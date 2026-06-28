@@ -27,6 +27,37 @@ class AdminUserController extends Controller
 
     public function show(User $user): JsonResponse
     {
+        $totalTicketReports = $user->ticketReports()->count();
+        $totalTryouts = $user->tryoutSessions()->count();
+        $completedSessions = $user->tryoutSessions()->where('status', 'finished')->with(['tryout', 'answers'])->get();
+        
+        $totalTryoutsCompleted = $completedSessions->count();
+        $totalScore = 0;
+        
+        foreach ($completedSessions as $session) {
+            $tryout = $session->tryout;
+            if (!$tryout) continue;
+            
+            $subtestIds = \App\Models\TryoutSubtest::where('tryout_id', $tryout->id)->pluck('subtest_id');
+            $totalQuestions = \App\Models\Question::whereIn('subtest_id', $subtestIds)
+                ->where('is_active', true)
+                ->count();
+                
+            $correct = $session->answers->where('is_correct', true)->count();
+            $finalScore = $totalQuestions > 0 ? ($correct / $totalQuestions) * 1000 : 0;
+            $totalScore += $finalScore;
+        }
+        
+        $averageScore = $totalTryoutsCompleted > 0 ? round($totalScore / $totalTryoutsCompleted, 2) : 0;
+
+        $user->setAttribute('statistics', [
+            'total_ticket_reports' => $totalTicketReports,
+            'total_tickets' => $totalTicketReports, // In case frontend uses this key
+            'total_tryouts' => $totalTryouts,
+            'completed_tryouts' => $totalTryoutsCompleted,
+            'average_score' => $averageScore,
+        ]);
+
         return response()->json(['data' => $user]);
     }
 
@@ -148,6 +179,73 @@ class AdminUserController extends Controller
             ->paginate($perPage);
 
         return response()->json($logs);
+    }
+
+    public function ticketReports(Request $request, User $user): JsonResponse
+    {
+        $perPage = $request->integer('per_page', 15);
+        $status  = $request->input('status');
+        $search  = $request->input('search');
+
+        $tickets = $user->ticketReports()->with('user:id,name,email')
+            ->when($status, fn ($q) => $q->where('status', $status))
+            ->when($search, fn ($q) => $q->where('title', 'like', "%{$search}%"))
+            ->latest()
+            ->paginate($perPage);
+
+        return response()->json($tickets);
+    }
+
+    public function tryouts(Request $request, User $user): JsonResponse
+    {
+        $perPage = min((int) ($request->per_page ?? 15), 100);
+        $search = $request->input('search');
+
+        $sessions = \App\Models\TryoutSession::with(['tryout', 'answers'])
+            ->where('user_id', $user->id)
+            ->when($search, function ($query, $search) {
+                $query->whereHas('tryout', function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%");
+                });
+            })
+            ->latest('created_at')
+            ->paginate($perPage);
+
+        $sessions->getCollection()->transform(function ($session) {
+            $tryout = $session->tryout;
+            $subtestIds = \App\Models\TryoutSubtest::where('tryout_id', $tryout->id)->pluck('subtest_id');
+            $totalQuestions = \App\Models\Question::whereIn('subtest_id', $subtestIds)
+                ->where('is_active', true)
+                ->count();
+                
+            $correct = $session->answers->where('is_correct', true)->count();
+            $finalScore = $totalQuestions > 0 ? ($correct / $totalQuestions) * 1000 : 0;
+            
+            $durationMinutes = 0;
+            if ($session->finished_at && $session->started_at) {
+                $durationMinutes = $session->finished_at->diffInMinutes($session->started_at);
+            }
+            
+            $statusStr = 'Abandoned';
+            if ($session->status === 'finished') {
+                $statusStr = 'Completed';
+            } elseif ($session->status === 'in_progress') {
+                $statusStr = 'Ongoing';
+            }
+
+            return [
+                'id' => $session->id,
+                'tryout_id' => $session->tryout_id,
+                'title' => $tryout->title ?? 'Unknown Tryout',
+                'category' => null, // Customize if tryout has category
+                'score' => round($finalScore, 2),
+                'duration' => $durationMinutes > 0 ? "{$durationMinutes} menit" : '-',
+                'status' => $statusStr,
+                'submitted_at' => $session->created_at->toIso8601String(),
+            ];
+        });
+
+        return response()->json($sessions);
     }
 
     public function injectVipTickets(Request $request): JsonResponse
