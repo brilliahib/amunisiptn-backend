@@ -27,6 +27,37 @@ class AdminUserController extends Controller
 
     public function show(User $user): JsonResponse
     {
+        $totalTicketReports = $user->ticketReports()->count();
+        $totalTryouts = $user->tryoutSessions()->count();
+        $completedSessions = $user->tryoutSessions()->where('status', 'finished')->with(['tryout', 'answers'])->get();
+        
+        $totalTryoutsCompleted = $completedSessions->count();
+        $totalScore = 0;
+        
+        foreach ($completedSessions as $session) {
+            $tryout = $session->tryout;
+            if (!$tryout) continue;
+            
+            $subtestIds = \App\Models\TryoutSubtest::where('tryout_id', $tryout->id)->pluck('subtest_id');
+            $totalQuestions = \App\Models\Question::whereIn('subtest_id', $subtestIds)
+                ->where('is_active', true)
+                ->count();
+                
+            $correct = $session->answers->where('is_correct', true)->count();
+            $finalScore = $totalQuestions > 0 ? ($correct / $totalQuestions) * 1000 : 0;
+            $totalScore += $finalScore;
+        }
+        
+        $averageScore = $totalTryoutsCompleted > 0 ? round($totalScore / $totalTryoutsCompleted, 2) : 0;
+
+        $user->setAttribute('statistics', [
+            'total_ticket_reports' => $totalTicketReports,
+            'total_tickets' => $totalTicketReports, // In case frontend uses this key
+            'total_tryouts' => $totalTryouts,
+            'completed_tryouts' => $totalTryoutsCompleted,
+            'average_score' => $averageScore,
+        ]);
+
         return response()->json(['data' => $user]);
     }
 
