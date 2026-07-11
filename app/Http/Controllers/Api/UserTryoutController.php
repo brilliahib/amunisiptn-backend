@@ -944,12 +944,23 @@ class UserTryoutController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
+        $totalParticipants = $leaderboard->count();
+        $averageScore = $totalParticipants > 0 ? round($leaderboard->avg('score.final_score'), 2) : 0;
+        $highestScore = $totalParticipants > 0 ? round($leaderboard->max('score.final_score'), 2) : 0;
+        $averageAccuracy = $totalParticipants > 0 ? round($leaderboard->avg('summary.accuracy'), 2) : 0;
+
         return response()->json([
             'data' => [
                 'tryout_id' => $tryout->id,
                 'tryout_title' => $tryout->title,
                 'use_irt' => $tryout->use_irt,
                 'leaderboard_basis' => 'attempt_number_1',
+                'statistics' => [
+                    'total_participants' => $totalParticipants,
+                    'average_score' => $averageScore,
+                    'highest_score' => $highestScore,
+                    'average_accuracy' => $averageAccuracy,
+                ],
                 'leaderboard' => $paginatedLeaderboard,
             ],
         ]);
