@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class UserTryoutController extends Controller
 {
@@ -932,13 +933,35 @@ class UserTryoutController extends Controller
                 return $row;
             });
 
+        $page = $request->integer('page', 1);
+        $perPage = 15;
+
+        $paginatedLeaderboard = new LengthAwarePaginator(
+            $leaderboard->forPage($page, $perPage)->values(),
+            $leaderboard->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        $totalParticipants = $leaderboard->count();
+        $averageScore = $totalParticipants > 0 ? round($leaderboard->avg('score.final_score'), 2) : 0;
+        $highestScore = $totalParticipants > 0 ? round($leaderboard->max('score.final_score'), 2) : 0;
+        $averageAccuracy = $totalParticipants > 0 ? round($leaderboard->avg('summary.accuracy'), 2) : 0;
+
         return response()->json([
             'data' => [
                 'tryout_id' => $tryout->id,
                 'tryout_title' => $tryout->title,
                 'use_irt' => $tryout->use_irt,
                 'leaderboard_basis' => 'attempt_number_1',
-                'leaderboard' => $leaderboard,
+                'statistics' => [
+                    'total_participants' => $totalParticipants,
+                    'average_score' => $averageScore,
+                    'highest_score' => $highestScore,
+                    'average_accuracy' => $averageAccuracy,
+                ],
+                'leaderboard' => $paginatedLeaderboard,
             ],
         ]);
     }
