@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TicketReport;
+use App\Notifications\TicketReportReplied;
+use App\Notifications\TicketReportStatusUpdated;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,6 +82,11 @@ class AdminTicketReportController extends Controller
             $ticketReport
         );
 
+        $ticketReport->loadMissing('user');
+        if ($ticketReport->user) {
+            $ticketReport->user->notify(new TicketReportStatusUpdated($ticketReport, $next));
+        }
+
         return response()->json([
             'success' => true,
             'data'    => $ticketReport->fresh(),
@@ -99,6 +106,11 @@ class AdminTicketReportController extends Controller
             'user_id' => $request->user()->id,
             'message' => $validated['message'],
         ]);
+
+        $ticketReport->loadMissing('user');
+        if ($ticketReport->user) {
+            $ticketReport->user->notify(new TicketReportReplied($ticketReport));
+        }
 
         return response()->json([
             'success' => true,

@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\BulkImportQuestionController;
 use App\Http\Controllers\Api\TicketLogController;
 use App\Http\Controllers\Api\TicketReportController;
 use App\Http\Controllers\Api\AdminTicketReportController;
+use App\Http\Controllers\Api\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -61,6 +62,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ticket-logs', [TicketLogController::class, 'index']);
     Route::get('/subtests', [SubtestController::class, 'index']);
 
+    // Notifications (User)
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
     // Ticket Reports (User)
     Route::get('/ticket-reports', [TicketReportController::class, 'index']);
     Route::post('/ticket-reports', [TicketReportController::class, 'store']);
